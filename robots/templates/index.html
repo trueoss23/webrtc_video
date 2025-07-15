@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC Video Stream</title>
+    <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+</head>
+<body>
+    <video id="video" autoplay playsinline controls></video>
+    
+    <script>
+        const video = document.getElementById('video');
+        const pc = new RTCPeerConnection({
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { 
+                    urls: 'turn:your-turn-server.com:3478',
+                    username: 'username',
+                    credential: 'password'
+                }
+            ]
+        });
+
+        pc.ontrack = (event) => {
+            console.log('Track received:', event.track.kind);
+            if (!video.srcObject && event.streams.length > 0) {
+                video.srcObject = event.streams[0];
+            }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+            console.log('ICE state:', pc.iceConnectionState);
+        };
+
+        async function start() {
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                const response = await fetch('/offer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        offer: pc.localDescription
+                    })
+                });
+                
+                const answer = await response.json();
+                await pc.setRemoteDescription(
+                    new RTCSessionDescription(answer)
+                );
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        start();
+    </script>
+</body>
+</html>
